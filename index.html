@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>⛈️ Storm Chaser 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: #000;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #mobileControls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            gap: 10px;
+            padding: 0 20px;
+            z-index: 100;
+        }
+        
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(0, 200, 100, 0.6);
+            border: 2px solid #0f0;
+            color: #0f0;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        
+        .control-btn:active {
+            background: rgba(0, 200, 100, 0.9);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+        }
+        
+        .control-btn.wide {
+            flex: 1;
+            width: auto;
+            min-width: 100px;
+        }
+        
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            padding: 15px;
+            border: 2px solid #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border-radius: 5px;
+            max-width: 280px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+        
+        #hud h3 {
+            color: #0f0;
+            margin-bottom: 8px;
+            font-size: 16px;
+            text-shadow: 0 0 10px #0f0;
+        }
+        
+        .stat-bar {
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .stat-label {
+            width: 100px;
+            color: #0f0;
+        }
+        
+        .bar {
+            width: 80px;
+            height: 12px;
+            border: 1px solid #0f0;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00);
+            transition: width 0.2s;
+        }
+        
+        .stat-value {
+            width: 35px;
+            text-align: right;
+            font-size: 10px;
+        }
+        
+        #radar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            height: 150px;
+            border: 2px solid #0f0;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+        
+        #radarCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: block;
+        }
+        
+        #eventLog {
+            position: absolute;
+            bottom: 120px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            padding: 10px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 200px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+        
+        .log-entry {
+            margin: 3px 0;
+            padding: 2px;
+            border-bottom: 1px solid #0f0;
+        }
+        
+        .log-warning {
+            color: #ff6600;
+        }
+        
+        .log-danger {
+            color: #ff0000;
+        }
+        
+        .log-success {
+            color: #00ff00;
+        }
+
+        #windIndicator {
+            position: absolute;
+            top: 170px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            padding: 10px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            width: 150px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        .wind-bar {
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .wind-bar .bar {
+            flex: 1;
+            height: 8px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="hud">
+        <h3>⛈️ STORM</h3>
+        <div class="stat-bar">
+            <span class="stat-label">Distance:</span>
+            <span class="stat-value" id="distance">-</span>
+        </div>
+        <div class="stat-bar">
+            <span class="stat-label">Speed:</span>
+            <span class="stat-value" id="speed">0 mph</span>
+        </div>
+        <hr style="border: 1px solid #0f0; margin: 6px 0;">
+        <div class="stat-bar">
+            <span class="stat-label">Health:</span>
+            <div class="bar" style="flex: 1;">
+                <div class="bar-fill" id="healthBar" style="width: 100%"></div>
+            </div>
+            <span class="stat-value" id="healthVal">100%</span>
+        </div>
+        <div class="stat-bar">
+            <span class="stat-label">Fuel:</span>
+            <div class="bar" style="flex: 1;">
+                <div class="bar-fill" id="fuelBar" style="width: 100%"></div>
+            </div>
+            <span class="stat-value" id="fuelVal">100%</span>
+        </div>
+        <div class="stat-bar">
+            <span class="stat-label">Equip:</span>
+            <div class="bar" style="flex: 1;">
+                <div class="bar-fill" id="equipBar" style="width: 100%"></div>
+            </div>
+            <span class="stat-value" id="equipVal">100%</span>
+        </div>
+    </div>
+    
+    <div id="windIndicator">
+        <div>Wind Speed</div>
+        <div class="wind-bar">
+            <div class="bar" style="flex: 1;">
+                <div class="bar-fill" id="windBar" style="width: 30%; background: linear-gradient(90deg, #00aaff, #0088ff);"></div>
+            </div>
+            <span id="windVal" style="width: 40px; text-align: right;">30 mph</span>
+        </div>
+    </div>
+    
+    <div id="radar">
+        <canvas id="radarCanvas" width="150" height="150"></canvas>
+    </div>
+    
+    <div id="eventLog">
+        <div class="log-entry log-success">Game Started</div>
+        <div class="log-entry">Storm detected</div>
+    </div>
+    
+    <div id="mobileControls">
+        <button class="control-btn" id="leftBtn">←</button>
+        <button class="control-btn wide" id="forwardBtn">↑</button>
+        <button class="control-btn" id="rightBtn">→</button>
+        <button class="control-btn" id="reverseBtn">↓</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Touch-friendly mobile controls
+        const touchControls = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false
+        };
+
+        const buttons = {
+            forward: document.getElementById('forwardBtn'),
+            left: document.getElementById('leftBtn'),
+            right: document.getElementById('rightBtn'),
+            backward: document.getElementById('reverseBtn')
+        };
+
+        ['forward', 'left', 'right', 'backward'].forEach(dir => {
+            buttons[dir].addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchControls[dir] = true;
+            });
+            buttons[dir].addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchControls[dir] = false;
+            });
+        });
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x4a5f8f);
+        scene.fog = new THREE.Fog(0x4a5f8f, 600, 1200);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        directionalLight.position.set(100, 100, 100);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(800, 800);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x7cb342 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Player vehicle (truck)
+        const truckGroup = new THREE.Group();
+        
+        const bodyGeometry = new THREE.BoxGeometry(2, 1.5, 4);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 0.75;
+        body.castShadow = true;
+        truckGroup.add(body);
+
+        // Wheels
+        const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 16);
+        const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        
+        const wheels = [];
+        const wheelPositions = [[-1, 0.5, -1], [1, 0.5, -1], [-1, 0.5, 1], [1, 0.5, 1]];
+
+        wheelPositions.forEach(pos => {
+            const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(...pos);
+            wheel.castShadow = true;
+            truckGroup.add(wheel);
+            wheels.push(wheel);
+        });
+
+        // Cabin
+        const cabinGeometry = new THREE.BoxGeometry(1.6, 1.2, 1.5);
+        const cabinMaterial = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+        const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
+        cabin.position.y = 1.5;
+        cabin.position.z = -0.5;
+        cabin.castShadow = true;
+        truckGroup.add(cabin);
+
+        // Equipment
+        const equipGeometry = new THREE.BoxGeometry(1.5, 0.5, 1.5);
+        const equipMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const equipment = new THREE.Mesh(equipGeometry, equipMaterial);
+        equipment.position.y = 2.3;
+        equipment.castShadow = true;
+        truckGroup.add(equipment);
+
+        scene.add(truckGroup);
+
+        // Storm cloud system
+        let stormDistance = 150;
+        const stormGroup = new THREE.Group();
+        
+        function createStormClouds() {
+            const cloudMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x222222,
+                emissive: 0x333333
+            });
+
+            for (let i = 0; i < 20; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(Math.random() * 25 + 15, 8, 8);
+                const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                cloud.position.set(
+                    (Math.random() - 0.5) * 100,
+                    Math.random() * 50 + 70,
+                    (Math.random() - 0.5) * 100
+                );
+                cloud.scale.y = 0.6;
+                cloud.castShadow = true;
+                stormGroup.add(cloud);
+            }
+        }
+
+        createStormClouds();
+        stormGroup.position.z = -stormDistance;
+        scene.add(stormGroup);
+
+        // Rain particles
+        const rainCount = 3000;
+        const rainGeometry = new THREE.BufferGeometry();
+        const rainPositions = new Float32Array(rainCount * 3);
+
+        for (let i = 0; i < rainCount * 3; i += 3) {
+            rainPositions[i] = (Math.random() - 0.5) * 300;
+            rainPositions[i + 1] = Math.random() * 200;
+            rainPositions[i + 2] = (Math.random() - 0.5) * 300;
+        }
+
+        rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+        
+        const rainMaterial = new THREE.PointsMaterial({
+            color: 0xaaaaaa,
+            size: 0.5,
+            transparent: true,
+            sizeAttenuation: true
+        });
+
+        const rain = new THREE.Points(rainGeometry, rainMaterial);
+        rain.position.z = -stormDistance;
+        scene.add(rain);
+
+        // Game state
+        let gameState = {
+            health: 100,
+            fuel: 100,
+            equipment: 100,
+            distance: stormDistance,
+            velocity: 0,
+            maxSpeed: 0.4,
+            windSpeed: 30,
+            windDirection: 0,
+            timeSinceStart: 0
+        };
+
+        let lightningCounter = 0;
+
+        // Lightning creation
+        function createLightning() {
+            const points = [];
+            points.push(new THREE.Vector3(0, 100, 0));
+            
+            let x = 0, y = 90;
+            for (let i = 0; i < 10; i++) {
+                x += (Math.random() - 0.5) * 20;
+                y -= Math.random() * 12;
+                points.push(new THREE.Vector3(x, y, 0));
+            }
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 3 });
+            const lightning = new THREE.Line(geometry, material);
+            lightning.position.z = -stormDistance;
+            scene.add(lightning);
+            
+            setTimeout(() => {
+                scene.remove(lightning);
+                geometry.dispose();
+                material.dispose();
+            }, 100);
+        }
+
+        // HUD Updates
+        function updateHUD() {
+            const distKm = (gameState.distance / 1000).toFixed(1);
+            document.getElementById('distance').textContent = distKm + ' km';
+            
+            const speedMph = (gameState.velocity * 60).toFixed(0);
+            document.getElementById('speed').textContent = speedMph + ' mph';
+            
+            document.getElementById('healthVal').textContent = gameState.health.toFixed(0) + '%';
+            document.getElementById('fuelVal').textContent = gameState.fuel.toFixed(0) + '%';
+            document.getElementById('equipVal').textContent = gameState.equipment.toFixed(0) + '%';
+            document.getElementById('windVal').textContent = gameState.windSpeed.toFixed(0) + ' mph';
+
+            document.getElementById('healthBar').style.width = Math.max(0, gameState.health) + '%';
+            document.getElementById('fuelBar').style.width = Math.max(0, gameState.fuel) + '%';
+            document.getElementById('equipBar').style.width = Math.max(0, gameState.equipment) + '%';
+            document.getElementById('windBar').style.width = Math.min(100, gameState.windSpeed / 2) + '%';
+        }
+
+        function addLog(text, type = 'info') {
+            const log = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + type;
+            entry.textContent = '> ' + text;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+
+            if (log.children.length > 8) {
+                log.removeChild(log.children[1]);
+            }
+        }
+
+        function updateRadar() {
+            const radarCanvas = document.getElementById('radarCanvas');
+            const ctx = radarCanvas.getContext('2d');
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 150, 150);
+            
+            // Grid
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 150; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, 150);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(150, i);
+                ctx.stroke();
+            }
+
+            // Center crosshair
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(75, 75, 3, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Storm position
+            const radarDist = Math.min(60, (gameState.distance / stormDistance) * 60);
+            const stormX = 75;
+            const stormY = 75 - radarDist;
+
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(stormX, stormY, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Intensity rings
+            if (gameState.distance < 200) {
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(stormX, stormY, 15, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // Main animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            gameState.timeSinceStart += 1 / 60;
+
+            // Movement
+            if (touchControls.forward || touchControls.backward) {
+                if (touchControls.forward) {
+                    gameState.velocity = Math.min(gameState.velocity + 0.02, gameState.maxSpeed);
+                    gameState.fuel -= 0.08;
+                } else if (touchControls.backward) {
+                    gameState.velocity = Math.max(gameState.velocity - 0.02, -gameState.maxSpeed * 0.3);
+                    gameState.fuel -= 0.05;
+                }
+            } else {
+                gameState.velocity *= 0.92;
+            }
+
+            if (touchControls.left) {
+                truckGroup.rotation.y += 0.06;
+            }
+            if (touchControls.right) {
+                truckGroup.rotation.y -= 0.06;
+            }
+
+            // Move truck
+            const forward = new THREE.Vector3(0, 0, -gameState.velocity);
+            forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), truckGroup.rotation.y);
+            truckGroup.position.add(forward);
+
+            // Camera follow
+            camera.position.copy(truckGroup.position);
+            camera.position.y = 3;
+            camera.position.z += 6;
+            camera.lookAt(truckGroup.position);
+
+            // Update distance
+            gameState.distance = Math.sqrt(
+                Math.pow(truckGroup.position.x - stormGroup.position.x, 2) +
+                Math.pow(truckGroup.position.z - stormGroup.position.z, 2)
+            );
+
+            // Wind effects based on distance
+            gameState.windSpeed = Math.max(10, 80 - (gameState.distance / 3));
+
+            // Storm effects
+            if (gameState.distance < 250) {
+                lightningCounter++;
+                if (lightningCounter > 120 - (250 - gameState.distance) / 2) {
+                    createLightning();
+                    lightningCounter = 0;
+
+                    if (gameState.distance < 120) {
+                        gameState.health -= 3;
+                        addLog('Lightning strike!', 'danger');
+                    }
+                }
+
+                if (gameState.distance < 100) {
+                    gameState.health -= 0.3;
+                    gameState.equipment -= 0.15;
+                    
+                    if (Math.random() < 0.05) {
+                        addLog('Severe hail damage!', 'warning');
+                    }
+                }
+
+                if (gameState.distance < 50) {
+                    gameState.health -= 0.8;
+                    gameState.equipment -= 0.5;
+                    
+                    if (Math.random() < 0.15) {
+                        addLog('CRITICAL DAMAGE!', 'danger');
+                    }
+                }
+            }
+
+            // Rotate wheels
+            wheels.forEach(wheel => {
+                wheel.rotation.x += gameState.velocity * 0.3;
+            });
+
+            // Storm movement pattern
+            stormGroup.position.z -= 0.02;
+            stormGroup.position.x += Math.sin(gameState.timeSinceStart * 0.3) * 0.05;
+
+            // Fuel consumption
+            if (gameState.fuel > 0 && gameState.velocity === 0) {
+                gameState.fuel = Math.max(0, gameState.fuel - 0.02);
+            }
+
+            // Natural damage degradation
+            gameState.equipment = Math.max(0, gameState.equipment - 0.005);
+
+            // Out of fuel
+            if (gameState.fuel <= 0) {
+                gameState.velocity = 0;
+                if (gameState.fuel === 0) {
+                    addLog('OUT OF FUEL - Stranded!', 'danger');
+                }
+            }
+
+            // Vehicle destroyed
+            if (gameState.health <= 0) {
+                gameState.health = 0;
+                gameState.velocity = 0;
+                if (gameState.health === 0) {
+                    addLog('VEHICLE DESTROYED!', 'danger');
+                }
+            }
+
+            updateHUD();
+            updateRadar();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        addLog('Storm detected ahead');
+        addLog('Begin chase sequence');
+    </script>
+</body>
+</html>
